@@ -10,11 +10,19 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.cache.RedisCacheManager;
+import org.springframework.data.redis.cache.RedisCacheConfiguration;
+import org.springframework.data.redis.serializer.RedisSerializationContext;
+import org.springframework.data.redis.serializer.StringRedisSerializer;
+import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 
 import javax.persistence.Entity;
 import javax.persistence.Id;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
+import java.time.Duration;
 
 @SpringBootApplication
 public class Application {
@@ -52,6 +60,18 @@ public class Application {
 	public Binding binding2(Queue wordCountersQueue, TopicExchange exchange) {
 		return BindingBuilder.bind(wordCountersQueue).to(exchange).with("word-counters");
 	}
+
+	@Bean
+	public RedisCacheManager cacheManager(StringRedisTemplate redisTemplate) {
+		RedisCacheConfiguration config = RedisCacheConfiguration.defaultCacheConfig()
+				.serializeKeysWith(RedisSerializationContext.SerializationPair.fromSerializer(new StringRedisSerializer()))
+				.serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(new GenericJackson2JsonRedisSerializer()))
+				.entryTtl(Duration.ofMinutes(10));
+
+		return RedisCacheManager.builder(redisTemplate.getConnectionFactory())
+				.withInitialCacheConfigurations(Map.of("wordCount", config))
+				.build();
+	}
 }
 
 @Service
@@ -59,24 +79,39 @@ class WordCountService {
 
 	private final RabbitTemplate rabbitTemplate;
 	private final WordCountRepository wordCountRepository;
+	private final StringRedisTemplate redisTemplate;
 
-	public WordCountService(RabbitTemplate rabbitTemplate, WordCountRepository wordCountRepository) {
+	public WordCountService(RabbitTemplate rabbitTemplate, WordCountRepository wordCountRepository, StringRedisTemplate redisTemplate) {
 		this.rabbitTemplate = rabbitTemplate;
 		this.wordCountRepository = wordCountRepository;
+		this.redisTemplate = redisTemplate;
 	}
 
 	public void processWords(String message) {
 		String[] words = message.split("\\s+");
 		for (String word : words) {
-			AtomicLong count = wordCountRepository.findById(word)
-					.map(WordCount::getCount)
-					.orElseGet(() -> {
-						WordCount newCount = new WordCount(word, 0L);
-						wordCountRepository.save(newCount);
-						return 0L;
-					});
+			String cacheKey = "wordCount:" + word;
+			
+			// Try to get from cache first
+			String cachedCount = redisTemplate.opsForValue().get(cacheKey);
+			Long count;
+			
+			if (cachedCount != null) {
+				count = Long.parseLong(cachedCount);
+			} else {
+				// Get from database if not in cache
+				count = wordCountRepository.findById(word)
+						.map(WordCount::getCount)
+						.orElse(0L);
+			}
+			
 			long newCount = count + 1;
+			
+			// Update both database and cache
 			wordCountRepository.save(new WordCount(word, newCount));
+			redisTemplate.opsForValue().set(cacheKey, String.valueOf(newCount));
+			
+			// Send to RabbitMQ
 			rabbitTemplate.convertAndSend("word-counters", new WordCount(word, newCount));
 		}
 	}
