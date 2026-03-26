@@ -1,0 +1,14 @@
+---
+applications:
+- name: spring-boot-kafka-stream-test-modernized
+  memory: 1G
+  instances: 1
+  buildpacks:
+    - java_buildpack
+  path: target/*.jar
+  env:
+    JBP_CONFIG_OPEN_JDK_JRE: '{ jre: { version: 21.+ } }'
+    SPRING_PROFILES_ACTIVE: cloud
+  services:
+    - modernized-rabbitmq
+
