@@ -17,12 +17,14 @@ import org.springframework.data.redis.cache.RedisCacheConfiguration;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import javax.persistence.Entity;
 import javax.persistence.Id;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 import java.time.Duration;
+import java.util.Map;
 
 @SpringBootApplication
 public class Application {
@@ -80,11 +82,13 @@ class WordCountService {
 	private final RabbitTemplate rabbitTemplate;
 	private final WordCountRepository wordCountRepository;
 	private final StringRedisTemplate redisTemplate;
+	private final JdbcTemplate jdbcTemplate;
 
-	public WordCountService(RabbitTemplate rabbitTemplate, WordCountRepository wordCountRepository, StringRedisTemplate redisTemplate) {
+	public WordCountService(RabbitTemplate rabbitTemplate, WordCountRepository wordCountRepository, StringRedisTemplate redisTemplate, JdbcTemplate jdbcTemplate) {
 		this.rabbitTemplate = rabbitTemplate;
 		this.wordCountRepository = wordCountRepository;
 		this.redisTemplate = redisTemplate;
+		this.jdbcTemplate = jdbcTemplate;
 	}
 
 	public void processWords(String message) {
