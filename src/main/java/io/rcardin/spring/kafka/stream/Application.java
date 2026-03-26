@@ -116,25 +116,3 @@ class WordCount {
 
 interface WordCountRepository extends JpaRepository<WordCount, String> {
 }
-
-// existing code
-// @EnableKafkaStreams
-// public class Application {
-//
-//     public static void main(String[] args) {
-//         SpringApplication.run(Application.class, args);
-//     }
-//
-//     @Bean
-//     public KStream<String, Long> kStreamWordCounter(StreamsBuilder streamsBuilder) {
-//         final KStream<String, Long> wordCountStream = streamsBuilder
-//                 .stream("words", Consumed.with(Serdes.String(), Serdes.String()))
-//                 .flatMapValues(word -> Arrays.asList(word.split(" ")))
-//                 .map(((key, value) -> new KeyValue<>(value, value)))
-//                 .groupByKey()
-//                 .count()
-//                 .toStream();
-//         wordCountStream.to("word-counters", Produced.with(Serdes.String(), Serdes.Long()));
-//         return wordCountStream;
-//     }
-// }
