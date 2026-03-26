@@ -18,6 +18,7 @@ import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
 import javax.persistence.Entity;
 import javax.persistence.Id;
@@ -73,6 +74,16 @@ public class Application {
 		return RedisCacheManager.builder(redisTemplate.getConnectionFactory())
 				.withInitialCacheConfigurations(Map.of("wordCount", config))
 				.build();
+	}
+	
+	@Bean
+	public DriverManagerDataSource dataSource() {
+		DriverManagerDataSource dataSource = new DriverManagerDataSource();
+		dataSource.setDriverClassName("org.postgresql.Driver");
+		dataSource.setUrl("jdbc:postgresql://localhost:5432/wordcountdb");
+		dataSource.setUsername("postgres");
+		dataSource.setPassword("password");
+		return dataSource;
 	}
 }
 
